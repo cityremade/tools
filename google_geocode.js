@@ -1,153 +1,152 @@
-var GKEY = ""; // google API key
+/*const $ = {
+    connection: "",
+    gkey: "",
+    _table: "",
+    limit: 50,
+    item: [],
+    address_field: "" // address column or sql concatenation
+}*/
 
 const promise = require('bluebird'),
       request = require('request'),
       pgp = require('pg-promise')({promiseLib: promise, noWarnings: true});
 
-const connection = ""; // postgres connection string
-
-const table = "", limit = 50;
-
-const db = pgp(connection);
-
-
-// select rows with empty coordinates
-function select_rows(limit, callback){
+module.exports = function($){
     
-    let query = "select id, address from " + table + " where lat is null or lng is null order by id limit " + limit + ";";
+    $.db = pgp($.connection);
     
-    db.any(query)
-    .then(function(data){
-        let arr = []; len = data.length;
+    function select(callback){
+        
+        let addr;
+        
+        $.urls = [];
+        
+        if($.address_field) {
+            addr = ", " + $.address_field;
+        } else {
+            addr = ", address";
+        }
+        
+        let query = "select id " + addr + " as address from " + $._table + " where lat is null or lng is null order by id limit " + $.limit + ";";
+        
+        //console.log(query);
+        
+        $.db.any(query)
+            .then(function(data){
+            let len = data.length;
+            
+            for(let i=0; i<len; i++){
+                $.urls.push({"id": data[i].id, "address": data[i].address});
+            }
+            
+            if(typeof(callback)==='function'){
+                callback($.urls);
+            } else {
+                console.log('No callback function defined.');
+                console.log($.urls); 
+            }
+        })
+            .catch(function(e){
+            console.log(e);
+        });
+    }
+    
+    function construct_URLs(items){
+        var base_url = 'https://maps.googleapis.com/maps/api/geocode/json?',
+            auth = "&key=" + $.gkey + '&address=',
+            len = items.length, 
+            urls = [];
         
         for(let i=0; i<len; i++){
-            arr.push({"id": data[i].id, "address": data[i].address});
-        }
-        
-        if(typeof(callback)==='function'){
-            callback(arr);
-        } else {
-            console.log('No callback function defined.');
-            console.log(arr); 
-        }
-    })
-    .catch(function(e){
-        console.log(e);
-    });
-}
-
-// create array of request urls
-function construct_URLs(items){
-    var base_url = 'https://maps.googleapis.com/maps/api/geocode/json?',
-        auth = "&key=" + GKEY + '&address=',
-        len = items.length, 
-        urls = [];
-    
-    for(let i=0; i<len; i++){
-        let address = (items[i].address).replace(new RegExp(" ", "g"), "+"),
-            reqURL = base_url + auth + address,
-            url = {
-                "id": items[i].id,
-                "url": reqURL
-            };
-        urls.push(url);
-        
-        //console.log(urls);
-        console.log('url array constructed');
-        
-        try {
-            if(urls.length){
-                fire_requests(urls);
-            } else {
-                console.log('All dataset geocoded.');
+            let address = (items[i].address).replace(new RegExp(" ", "g"), "+"),
+                reqURL = base_url + auth + address,
+                url = {
+                    "id": items[i].id,
+                    "url": reqURL
+                };
+            
+            urls.push(url);
+            
+            //console.log(urls);
+            console.log('url array constructed');
+            
+            try {
+                if(urls.length){
+                    fire_requests(urls);
+                } else {
+                    console.log('All dataset geocoded.');
             }
-        } catch(e){
-            console.log(e);
+            } catch(e){
+                console.log(e);
+            }
         }
     }
-}
-
-
-function fire_requests(urls){
-    console.log('starting requests');
     
-    urls.map(function(url){
-        request(url.url, function(error, response,body){
-            if(!error){
-                try {
-                    var json = JSON.parse(body) || undefined;
-                    
-                    if(!!json.results[0]){
+    function fire_requests(urls){
+        console.log('starting requests');
+        
+        urls.map(function(url){
+            request(url.url, function(error, response,body){
+                if(!error){
+                    try {
+                        var json = JSON.parse(body) || undefined;
                         
-                        let lat = json.results[0].geometry.location.lat,
-                            lng = json.results[0].geometry.location.lng,
-                            item = {
-                                "id": url.id,
-                                "lat": lat,
-                                "lng": lng
-                            };
+                        if(!!json.results[0]){
+                            
+                            let lat = json.results[0].geometry.location.lat,
+                                lng = json.results[0].geometry.location.lng,
+                                item = {
+                                    "id": url.id,
+                                    "lat": lat,
+                                    "lng": lng
+                                };
+                            
+                            console.log('successfuly geocoded: ' + JSON.stringify(item));
+                            
+                            update_row(item);
                         
-                        console.log('successfuly geocoded: ' + JSON.stringify(item));
-                        
-                        update_row(item);
-                    
-                    } else {
-                        console.log('zero results for ' + url.url + " " + url.id);
+                        } else {
+                            console.log('zero results for ' + url.url + " " + url.id);
+                        }
+                    } catch (e){
+                        console.log(e);
                     }
-                } catch (e){
-                    console.log(e);
+                } else {
+                    console.log(body);
                 }
-            } else {
-                console.log(body);
-            }
+            });
         });
-    });
-}
-
-// update row with coordinates
-function update_row(item){
-    let id = item.id,
-        lat = item.lat,
-        lng = item.lng;
+    }
     
-    let update = "update " + table + " set lat = " + lat 
-    + ", lng = " + lng + " where id = " + id + ";";  
+    // update row with coordinates
+    function update_row(item){
+        let id = item.id,
+            lat = item.lat,
+            lng = item.lng;
+        
+        let update = "update " + $._table + " set lat = " + lat 
+        + ", lng = " + lng + " where id = " + id + ";";  
+        
+        console.log(update);
+        
+        $.db.any(update).then(function(){
+            console.log(id + ' updated.');
+        }).catch(function(err){
+            console.log(err);
+        });
+    }
     
-    console.log(update);
+    /* execution */
+    function geocode(){
+        select(construct_URLs);
+        if($.urls.length) {
+            setTimeout(function(){
+                select(construct_URLs);
+            }, 1000*61);
+        }
+    }
     
-    db.any(update).then(function(){
-        console.log(id + ' updated.');
-    }).catch(function(err){
-        console.log(err);
-    });
+    return {
+        geocode: geocode
+    }
 }
-
-
-/* Table create statement
-
-create table data_to_geocode
-(
-	id serial not null
-		constraint aus_retail_id_pk
-			primary key,
-	address text,
-	lat double precision,
-	lng double precision
-);
-
-create index gix_data_to_geocode_geom
-	on data_to_geocode using GIST(geom);
-
--- trim whitespace, new lines etc. from address
-
-*/
-
-/* execution */
-function geocode(){
-    select_rows(limit, construct_URLs);
-    setTimeout(function(){
-        select_rows(limit, construct_URLs);
-    }, 1000*61);
-}
-
-// geocode();
