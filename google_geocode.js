@@ -4,7 +4,7 @@
     _table: "",
     limit: 50,
     item: [],
-    address_field: "" // address column or sql concatenation
+    address_field: "" // address columns or concatenation
 }*/
 
 const promise = require('bluebird'),
@@ -21,13 +21,15 @@ module.exports = function($){
         
         $.urls = [];
         
+        $.id_alias ? $.id = $.id_alias : $.id = "id";
+        
         if($.address_field) {
             addr = ", " + $.address_field;
         } else {
             addr = ", address";
         }
         
-        let query = "select id " + addr + " as address from " + $._table + " where lat is null or lng is null order by id limit " + $.limit + ";";
+        let query = "select " + $.id + " as id " + addr + " as address from " + $._table + " where lat is null or lng is null order by id limit " + $.limit + ";";
         
         //console.log(query);
         
@@ -125,7 +127,7 @@ module.exports = function($){
             lng = item.lng;
         
         let update = "update " + $._table + " set lat = " + lat 
-        + ", lng = " + lng + " where id = " + id + ";";  
+        + ", lng = " + lng + " where " + $.id_alias + " = " + id + ";";  
         
         console.log(update);
         
