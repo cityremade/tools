@@ -29,6 +29,7 @@ module.exports = function($){
             addr = ", address";
         }
         
+        // added deliver for pizza hut table
         let query = "select " + $.id + " as id " + addr + " as address from " + $._table + " where lat is null or lng is null order by id limit " + $.limit + ";";
         
         //console.log(query);
@@ -49,7 +50,8 @@ module.exports = function($){
             }
         })
             .catch(function(e){
-            console.log(e);
+            console.log($.id + ": " + e);
+            //console.log(e);
         });
     }
     
@@ -60,7 +62,7 @@ module.exports = function($){
             urls = [];
         
         for(let i=0; i<len; i++){
-            let address = (items[i].address).replace(new RegExp(" ", "g"), "+"),
+            let address = (items[i].address.replace(new RegExp(", ", "g"), ",")).replace(new RegExp(" ", "g"), "+"),
                 reqURL = base_url + auth + address,
                 url = {
                     "id": items[i].id,
@@ -68,19 +70,18 @@ module.exports = function($){
                 };
             
             urls.push(url);
-            
+        }
             //console.log(urls);
-            console.log('url array constructed');
-            
-            try {
-                if(urls.length){
-                    fire_requests(urls);
-                } else {
-                    console.log('All dataset geocoded.');
+        console.log('url array of ' + urls.length + ' constructed');
+        
+        try {
+            if(urls.length){
+                fire_requests(urls);
+            } else {
+                console.log('All dataset geocoded.');
             }
-            } catch(e){
-                console.log(e);
-            }
+        } catch(e){
+            console.log(e);
         }
     }
     
@@ -109,12 +110,14 @@ module.exports = function($){
                         
                         } else {
                             console.log('zero results for ' + url.url + " " + url.id);
+                            update_row({"id": url.id, "lat": -1, "lng": -1});
                         }
                     } catch (e){
-                        console.log(e);
+                        update_row({"id": url.id, "lat": -1, "lng": -1});
+                        console.log(url.id + ": " + e);
                     }
                 } else {
-                    console.log(body);
+                    //console.log(body);
                 }
             });
         });
@@ -127,7 +130,7 @@ module.exports = function($){
             lng = item.lng;
         
         let update = "update " + $._table + " set lat = " + lat 
-        + ", lng = " + lng + " where " + $.id_alias + " = " + id + ";";  
+        + ", lng = " + lng + " where " + $.id + " = " + id + ";";  
         
         console.log(update);
         
@@ -138,14 +141,12 @@ module.exports = function($){
         });
     }
     
-    /* execution */
     function geocode(){
         select(construct_URLs);
-        if($.urls.length) {
-            setTimeout(function(){
-                select(construct_URLs);
-            }, 1000*61);
-        }
+        setInterval(function(){
+            select(construct_URLs);
+        }, 1000*61);
+        //if(!$.urls.length) clearInterval(interval);
     }
     
     return {
