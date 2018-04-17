@@ -62,8 +62,9 @@ module.exports = function($){
             urls = [];
         
         for(let i=0; i<len; i++){
-            let address = (items[i].address.replace(new RegExp(", ", "g"), ",")).replace(new RegExp(" ", "g"), "+"),
-                reqURL = base_url + auth + address,
+            let address = (items[i].address.replace(new RegExp(", ", "g"), "+"));
+                address = encodeURIComponent(address);
+                reqURL = base_url + auth + address;
                 url = {
                     "id": items[i].id,
                     "url": reqURL
@@ -79,6 +80,7 @@ module.exports = function($){
                 fire_requests(urls);
             } else {
                 console.log('All dataset geocoded.');
+                return;
             }
         } catch(e){
             console.log(e);
@@ -140,6 +142,16 @@ module.exports = function($){
             console.log(err);
         });
     }
+    
+    /* execution */
+    /*function geocode(){
+        select(construct_URLs);
+        //if($.urls.length) {
+            setTimeout(function(){
+                select(construct_URLs);
+            }, 1000*61);
+        //}
+    }*/
     
     function geocode(){
         select(construct_URLs);
