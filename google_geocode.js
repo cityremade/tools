@@ -43,7 +43,12 @@ module.exports = function($){
             }
             
             if(typeof(callback)==='function'){
-                callback($.urls);
+                if($.urls.length){
+                    callback($.urls);
+                } else {
+                    console.log('All dataset geocoded. Exiting... ');
+                    return;
+                }
             } else {
                 console.log('No callback function defined.');
                 console.log($.urls); 
@@ -144,21 +149,12 @@ module.exports = function($){
     }
     
     /* execution */
-    /*function geocode(){
-        select(construct_URLs);
-        //if($.urls.length) {
-            setTimeout(function(){
-                select(construct_URLs);
-            }, 1000*61);
-        //}
-    }*/
     
-    function geocode(){
+    function geocode($){
         select(construct_URLs);
-        setInterval(function(){
-            select(construct_URLs);
-        }, 1000*61);
-        //if(!$.urls.length) clearInterval(interval);
+        setTimeout(function(){
+            geocode();
+        }, 61*1000);
     }
     
     return {
